@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+  <meta charset="utf-8">
+  <meta name="generator" content="quarto-0.9.165">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+  <title>Salmonella shedding predictions</title>
+  <style>
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    span.underline{text-decoration: underline;}
+    div.column{display: inline-block; vertical-align: top; width: 50%;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    ul.task-list{list-style: none;}
+  </style>
+
+  <script src="shedding_predictions_report_files/libs/clipboard/clipboard.min.js"></script>
+  <script src="shedding_predictions_report_files/libs/quarto-html/quarto.js"></script>
+  <script src="shedding_predictions_report_files/libs/quarto-html/popper.min.js"></script>
+  <script src="shedding_predictions_report_files/libs/quarto-html/tippy.umd.min.js"></script>
+  <script src="shedding_predictions_report_files/libs/quarto-html/anchor.min.js"></script>
+  <link href="shedding_predictions_report_files/libs/quarto-html/tippy.css" rel="stylesheet">
+  <link id="quarto-text-highlighting-styles" href="shedding_predictions_report_files/libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet">
+  <script src="shedding_predictions_report_files/libs/bootstrap/bootstrap.min.js"></script>
+  <link href="shedding_predictions_report_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+  <link href="shedding_predictions_report_files/libs/bootstrap/bootstrap.min.css" rel="stylesheet">
+  <!--[if lt IE 9]>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/html5shiv/3.7.3/html5shiv-printshiv.min.js"></script>
+  <![endif]-->
+</head>
+<body class="fullcontent">
+<div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
+
+<main class="content" id="quarto-document-content">
+<header id="title-block-header" class="quarto-title-block default">
+
+<div class="quarto-title"><h1 class="title display-7">Salmonella shedding predictions</h1></div></header>
+<section id="goals" class="level2">
+<h2 class="anchored" data-anchor-id="goals">Goals</h2>
+<p>Can D0 fecal microbiomes be used to predict future Salmonella shedding?</p>
+<p>This work uses the FS12b D0 fecal microbiomes. In addition to the standard fecal communities, we also sequenced the tetrathionate broth enrichments inoculated with the D0 fecal material.</p>
+<p>Each animal therefore has 2 samples associated with their D0 communities. I removed animals that did not have both the standard fecal community and the tet community.</p>
+<p>60 animals to begin with, 4 missing = 54 total animals</p>
+<p>Chris already did some work in this area and tried to use just the D0 samples to predict future shedding. His results showed that the D0 fecal communities may be predictive of the shedding values in the middle of the distribution, but failed to predict the very high and low extremes.</p>
+<p>This may suggest that the information needed to predict future shedding is not encoded in the D0 fecal communities alone.</p>
+<p>16S amplicons may miss rare members that give more information about the overall gut ecosystem and its resilence to invasion.</p>
+<p>Alternatively, the fecal microbial community may not contain the needed information at all, and maybe we need to measure certain host factors to get good predictive power.</p>
+</section>
+<section id="to-do" class="level2">
+<h2 class="anchored" data-anchor-id="to-do">To Do</h2>
+<ol type="1">
+<li>Feature engineering:<br>
+</li>
+</ol>
+<ul>
+<li>dimension reduction of tet and fecal communities
+<ul>
+<li>PCA: keep PCs that contain &gt;90% variation FOR EACH community</li>
+<li>try NMDS too</li>
+<li>add diversity as feature? (shannon simpson etc)</li>
+</ul></li>
+</ul>
+</section>
+<section id="feature-engineering" class="level2">
+<h2 class="anchored" data-anchor-id="feature-engineering">Feature Engineering</h2>
+
+</section>
+</main>
+<!-- /main column -->
+<script type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const clipboard = new window.ClipboardJS('.code-copy-button', {
+    target: function(trigger) {
+      return trigger.previousElementSibling;
+    }
+  });
+  clipboard.on('success', function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    setTimeout(function() {
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  });
+  function tippyHover(el, contentFn) {
+    const config = {
+      allowHTML: true,
+      content: contentFn,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start'
+    };
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      let href = ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      return note.innerHTML;
+    });
+  }
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const cites = ref.parentNode.getAttribute('data-cites').split(' ');
+    tippyHover(ref, function() {
+      var popup = window.document.createElement('div');
+      cites.forEach(function(cite) {
+        var citeDiv = window.document.createElement('div');
+        citeDiv.classList.add('hanging-indent');
+        citeDiv.classList.add('csl-entry');
+        var biblioDiv = window.document.getElementById('ref-' + cite);
+        if (biblioDiv) {
+          citeDiv.innerHTML = biblioDiv.innerHTML;
+        }
+        popup.appendChild(citeDiv);
+      });
+      return popup.innerHTML;
+    });
+  }
+});
+</script>
+</div> <!-- /content -->
+
+
+</body></html>

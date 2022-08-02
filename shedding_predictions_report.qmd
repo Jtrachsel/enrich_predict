@@ -1,0 +1,34 @@
+---
+title: "Salmonella shedding predictions"
+format: html
+editor: visual
+---
+
+## Goals
+
+Can D0 fecal microbiomes be used to predict future Salmonella shedding?
+
+This work uses the FS12b D0 fecal microbiomes.  In addition to the standard fecal communities, we also sequenced the tetrathionate broth enrichments inoculated with the D0 fecal material.  
+
+Each animal therefore has 2 samples associated with their D0 communities.  I removed animals that did not have both the standard fecal community and the tet community.  
+
+60 animals to begin with, 4 missing = 54 total animals 
+
+Chris already did some work in this area and tried to use just the D0 samples to predict future shedding.  His results showed that the D0 fecal communities may be predictive of the shedding values in the middle of the distribution, but failed to predict the very high and low extremes.  
+
+This may suggest that the information needed to predict future shedding is not encoded in the D0 fecal communities alone.  
+
+16S amplicons may miss rare members that give more information about the overall gut ecosystem and its resilence to invasion.
+
+Alternatively, the fecal microbial community may not contain the needed information at all, and maybe we need to measure certain host factors to get good predictive power.  
+
+## To Do  
+
+1) Feature engineering:  
+  - dimension reduction of tet and fecal communities
+    - PCA: keep PCs that contain >90% variation FOR EACH community
+    - try NMDS too 
+    - add diversity as feature? (shannon simpson etc)
+  
+## Feature Engineering  
+
