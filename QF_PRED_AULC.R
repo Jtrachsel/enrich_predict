@@ -1,16 +1,11 @@
 library(tidyverse)
 library(phyloseq)
 library(microbiome)
+library(DESeq2)
 
-
+usethis::use_directory('output')
 
 # TODO
-# look for differences in sequencing depth between F and Q 
-# subset to only samples with both F and Q
-# clr for each matrix independently?
-# other normalization?
-
-# 
 # 
 # meta <- 
 #   read_csv('data/FS12_16S_data/FS12_final_meta.csv') %>% sample_data()
@@ -22,9 +17,6 @@ library(microbiome)
 
 # PHYLO <- phyloseq(meta, OTU, TAX)
 
-# write_rds(x = PHYLO, file = '~/Documents/enrich_predict/phyloseq_obj.rds')
-# 
-# 
 # PHYLO <- 
 #   PHYLO %>%
 #   prune_samples(samples = 
@@ -34,7 +26,90 @@ library(microbiome)
 # 
 # PHYLO <- prune_taxa(taxa = taxa_sums(PHYLO) > 1, x = PHYLO) # remove singleton taxa
 # PHYLO <- prune_taxa(PHYLO, taxa = otu_table(PHYLO) %>% rowSums() > 3) # remove taxa found in fewer that 3 samples
+# write_rds(x = PHYLO, file = '~/Documents/enrich_predict/phyloseq_obj.rds')
 PHYLO <- read_rds('phyloseq_obj.rds')
+
+# straight up raw OTU counts into random forest
+
+# First F alone
+
+
+phy_melt <- 
+  PHYLO %>%
+  # microbiome::transform('alr', shift=1) %>%
+  microbiome::transform('compositional') %>%
+  # microbiome::transform('clr') %>%
+  psmelt2(sample.column = 'ID', feature.column = 'OTU')
+
+
+# then Q alone
+
+
+library(ranger)
+
+
+# 
+# phy_melt <- PHYLO %>% 
+#   microbiome::transform('clr') %>% 
+#   psmelt2(sample.column = 'ID', feature.column = 'OTU')
+
+
+both_QF <- 
+  phy_melt %>% 
+  # select(pignum, AULC, tissue, treatment, nurse_gain, OTU, value) %>% 
+  # select(pignum, AULC, tissue, treatment, OTU, value) %>% 
+  select(pignum, AULC, tissue, OTU, value) %>% 
+  mutate(OTU=paste0(tissue, OTU)) %>% 
+  select(-tissue) %>% 
+  pivot_wider(names_from = OTU, values_from = value) %>% 
+  na.omit() %>% 
+  column_to_rownames(var='pignum') %>% 
+  as.matrix()
+
+test_forest <- ranger(data=both_QF, formula = AULC ~ .,
+                      num.trees = 10000, 
+                      importance = 'permutation',
+                      min.node.size = 5)
+
+
+test_forest
+
+
+test_forest$predictions
+both_QF$AULC
+
+
+######
+
+library(xgboost)
+
+# data(agaricus.train, package='xgboost')
+# data(agaricus.test, package='xgboost')
+
+# dtrain <- with(agaricus.train, xgb.DMatrix(data, label = label))
+# dtest <- with(agaricus.test, xgb.DMatrix(data, label = label))
+# watchlist <- list(train = dtrain, eval = dtest)
+
+## A simple xgb.train example:
+# param <- list(max_depth = 2, eta = 1, verbose = 0, nthread = 2,
+#               objective = "binary:logistic", eval_metric = "auc")
+# bst <- xgb.train(param, dtrain, nrounds = 2, watchlist)
+
+
+
+# 
+# xgb_TEST <- 
+#   xgboost(data = both_QF[,-1],
+#           params = list(booster='gblinear'),
+#           label= both_QF[,1], nrounds = 2)
+# 
+# 
+# 
+# 
+# tibble(PRED=predict(xgb_TEST,both_QF[,-1]), 
+#        AULC=both_QF[,1])
+# 
+
 
 
 # are all the F and Q samples matched?
@@ -69,9 +144,34 @@ sample_sums(PHYLO) %>% hist()
 
 # rarefy to even depth for each sample
 # maybe try some methods without this...
-PHYLO <- PHYLO %>% rarefy_even_depth()
+PHYLO_rare <- PHYLO %>% rarefy_even_depth()
 
 #
+
+# what proportion of OTUs in Q were detected in F?
+
+
+DETECTED_IN_F <- 
+  PHYLO %>% 
+  prune_samples(samples=grepl('.*F$',PHYLO@sam_data$sample_ID)) %>% 
+  prune_taxa(taxa=taxa_sums(.) > 0) %>%
+  taxa_names()
+
+DETECTED_IN_Q <- 
+  PHYLO %>% 
+  prune_samples(samples=grepl('.*Q$',PHYLO@sam_data$sample_ID)) %>% 
+  prune_taxa(taxa=taxa_sums(.) > 0) %>%
+  taxa_names()
+
+
+ONLY_F <- DETECTED_IN_F[!(DETECTED_IN_F %in% DETECTED_IN_Q)]
+ONLY_Q <- DETECTED_IN_Q[!(DETECTED_IN_Q %in% DETECTED_IN_F)]
+
+length(ONLY_F)
+length(ONLY_Q)
+
+
+
 
 tibble(ID=names(sample_sums(PHYLO)),
        ssums=sample_sums(PHYLO)) %>% 
@@ -128,7 +228,9 @@ intra_animal_distances <-
   
 # some animals Q is very similar to their F
 # for others Q is very different than Q
-
+intra_animal_distances %>%
+  ggplot(aes(x=Q_F_dist)) +
+  geom_histogram(bins=25)
 
 
 #######
@@ -145,6 +247,15 @@ QF_diversity <-
   pivot_longer(cols = -c(ID, pignum, type), names_to = 'div_type')
 
 
+shan_difs <- 
+  QF_diversity %>% 
+  filter(div_type == 'shannon') %>% 
+  group_by(pignum) %>% 
+  summarise(shan_dif=value[type == 'F'] - value[type == 'Q']) %>% 
+  arrange(shan_dif)
+
+shan_difs %>% ggplot(aes(x=shan_dif)) + geom_histogram()
+
 QF_diversity %>% 
   ggplot(aes(x=type, y=value, group=pignum)) + 
   geom_point() + 
@@ -152,45 +263,54 @@ QF_diversity %>%
   facet_wrap(~div_type, scales = 'free')
 
 
-intra_animal_distances %>% left_join(QF_diversity)
+# intra_animal_distances %>% left_join(QF_diversity)
 #
 # within each fecal sample, 
 # is each taxa more abundant in the Q or F condition?
 # hist(log(tst$Abundance), breaks=50)
 
-tst <- 
+OTU_class_clr <- 
   psmelt2(PHYLO_clr, feature.column = 'OTU') %>% 
   mutate(TYPE=sub('.*([QF])$','\\1', sample_ID), 
          ID=sub('(.*)([QF])$','\\1', sample_ID)) %>%
   select(-sample_ID, -.SampleID) %>% 
-  select(-ends_with('ate')) 
-# tst %>% g
-
-tst <- 
-  tst %>%
+  select(-ends_with('ate')) %>% 
   group_by(OTU, ID) %>% 
   summarise(Q_m_F=value[tissue=='Q'] - value[tissue == 'F'], .groups = 'drop') %>% 
-  arrange(desc(Q_m_F)) #%>% pull(OTU) %>% unique()
-  # ggplot(aes(x=Q_d_F, y=Q_m_F)) + geom_point()
+  arrange(desc(Q_m_F))
+# tst %>% g
 
-tax_table(PHYLO_clr)
+
+OTU_class_relabund <- 
+  psmelt2(PHYLO_rel_abund, feature.column = 'OTU') %>% 
+  mutate(TYPE=sub('.*([QF])$','\\1', sample_ID), 
+         ID=sub('(.*)([QF])$','\\1', sample_ID)) %>%
+  select(-sample_ID, -.SampleID) %>% 
+  select(-ends_with('ate')) %>% 
+  group_by(OTU, ID) %>% 
+  summarise(Q_m_F=value[tissue=='Q'] - value[tissue == 'F'], .groups = 'drop') %>% 
+  arrange(desc(Q_m_F))
+
+
 
 # negative values mean OTU was more abundant in F types
 # positive values mean OTU was more abundant in Q types (tet enrichments)
 hist(tst$Q_m_F, breaks = 1000)
+# 
+# OTU_summary <- 
+#   tst %>%
+#   group_by(OTU) %>%
+#   summarise(av=mean(Q_m_F), 
+#             stdev=sd(Q_m_F), 
+#             stderr=stdev/n()) %>% 
+#   arrange(desc(av))
 
-OTU_summary <- 
-  tst %>%
-  group_by(OTU) %>%
-  summarise(av=mean(Q_m_F), 
-            stdev=sd(Q_m_F), 
-            stderr=stdev/n()) %>% 
-  arrange(desc(av))
+# hist(OTU_summary$av, breaks = 100)
 
-hist(OTU_summary$av, breaks = 100)
+OTU_class_relabund %>%  ggplot(aes(x=Q_m_F)) + geom_histogram()
 
-MODELS <- 
-  tst %>% 
+MODELS_rel_abund <- 
+  OTU_class_relabund %>% 
   group_by(OTU) %>%
   nest() %>% 
   mutate(mod=map(.x=data, .f=~lm(data=.x, Q_m_F ~ 1)), 
@@ -213,16 +333,110 @@ MODELS <-
          pos=ifelse(Est >0, 'pos', 'neg'))
 
 
-MODELS$Rank2 %>% table()
 
-MODELS %>%
+MODELS_rel_abund %>%
   filter(FDR < 0.05) %>% 
   ggplot(aes(x=Est, y=OTU, color=phylum)) + 
   geom_point() + 
   geom_segment(aes(x=c.low, xend=c.high, yend=OTU, color=phylum)) +
   geom_vline(xintercept = 0, color='red') + 
   coord_flip()+
-  facet_wrap(~phylum, nrow=1)
+  facet_wrap(~phylum, nrow=1, scales = 'free')
+
+
+####
+
+
+MODELS_clr <- 
+  OTU_class_clr %>% 
+  group_by(OTU) %>%
+  nest() %>% 
+  mutate(mod=map(.x=data, .f=~lm(data=.x, Q_m_F ~ 1)), 
+         SUM=map(.x=mod, .f=~summary(.x)), 
+         CONFINT=map(.x=mod, .f=~confint(object = .x)),
+         c.low=map_dbl(.x=CONFINT, .f=~pluck(.x, 1)),
+         c.high=map_dbl(.x=CONFINT, .f=~pluck(.x, 2)),
+         Est=map_dbl(.x=SUM, .f=~.x[['coefficients']][1]), 
+         PV=map_dbl(.x=SUM, .f=~.x[['coefficients']][4])) %>% 
+  ungroup() %>% 
+  mutate(FDR=p.adjust(PV, method = 'fdr')) %>% 
+  arrange((PV)) %>% 
+  left_join(
+    PHYLO@tax_table %>%
+      as(Class = 'matrix') %>%
+      as.data.frame() %>% 
+      rownames_to_column(var = 'OTU')
+  ) %>% 
+  mutate(phylum=fct_lump_n(f=Rank2, n=7), 
+         pos=ifelse(Est >0, 'pos', 'neg'))
+
+
+
+MODELS_clr %>%
+  filter(FDR < 0.05) %>% 
+  ggplot(aes(x=Est, y=OTU, color=phylum)) + 
+  geom_point() + 
+  geom_segment(aes(x=c.low, xend=c.high, yend=OTU, color=phylum)) +
+  geom_vline(xintercept = 0, color='red') + 
+  coord_flip()+
+  facet_wrap(~phylum, nrow=1, scales = 'free')
+
+
+
+MODELS_rel_abund %>%
+  filter(FDR < 0.05) %>%
+  # select(OTU, Est) %>%
+  ggplot(aes(x=Est, fill=phylum)) + geom_histogram(color='black')
+
+
+PHYLO@sam_data$pignum <- as.character(PHYLO@sam_data$pignum)
+
+
+
+PHYLO_DE <- phyloseq_to_deseq2(PHYLO, design = ~ factor(pignum) + tissue)
+# this takes quite a while... with pignum in the model
+PHYLO_DE <- DESeq(PHYLO_DE)
+
+resultsNames(PHYLO_DE)
+
+QF_RES <- 
+  lfcShrink(PHYLO_DE, coef = 'tissue_Q_vs_F', format = 'DataFrame') %>% 
+  as.data.frame() %>%
+  rownames_to_column(var='OTU') %>% 
+  left_join(
+    PHYLO@tax_table %>% 
+      as(Class='matrix') %>%
+      as.data.frame() %>% 
+      rownames_to_column(var='OTU') 
+    ) 
+
+QF_RES <- 
+  QF_RES %>% 
+  mutate(detected_in =case_when(
+    OTU %in% ONLY_F  ~ 'only_F', 
+    OTU %in% ONLY_Q  ~ 'only_Q', 
+    TRUE             ~ 'both'
+  ))
+
+QF_RES %>%
+  filter(padj < 0.05) %>% 
+  filter(abs(log2FoldChange) > 0.1) %>%
+  ggplot(aes(x=log2FoldChange, y=Rank3, fill=detected_in)) + 
+  geom_point(shape=21)
+
+### CLASSIFY OTUS HERE ####
+QF_RES <- 
+  QF_RES %>% 
+    mutate(
+    OTU_type = case_when(
+      log2FoldChange  >  0.1 & padj < 0.05 ~ 'Q', 
+      log2FoldChange  < -0.1 & padj < 0.05 ~ 'F', 
+      TRUE               ~ 'neutral'
+    )
+  )
+
+QF_RES %>% write_tsv('output/OTU_QF_class.tsv')
+####
 
 # TAX %>%
 #   as(Class = 'matrix') %>%
@@ -265,28 +479,7 @@ MODELS %>% filter(FDR <=0.1)
 
 
 
-# what proportion of OTUs in Q were detected in F?
 
-
-DETECTED_IN_F <- 
-  PHYLO %>% 
-  prune_samples(samples=grepl('.*F$',PHYLO@sam_data$sample_ID)) %>% 
-  prune_taxa(taxa=taxa_sums(.) > 0) %>%
-  taxa_names()
-
-DETECTED_IN_Q <- 
-  PHYLO %>% 
-  prune_samples(samples=grepl('.*Q$',PHYLO@sam_data$sample_ID)) %>% 
-  prune_taxa(taxa=taxa_sums(.) > 0) %>%
-  taxa_names()
-
-
-### THIS IS WRONG ###
-ONLY_F <- DETECTED_IN_F[!(DETECTED_IN_F %in% DETECTED_IN_Q)]
-ONLY_Q <- DETECTED_IN_Q[!(DETECTED_IN_Q %in% DETECTED_IN_F)]
-
-length(ONLY_F)
-length(ONLY_Q)
 
 
 MODELS %>%
@@ -307,7 +500,7 @@ MODELS %>%
 MODELS %>% filter(FDR < 0.1)
 
 
-
-
+library(ranger)
+ranger()
 
 
